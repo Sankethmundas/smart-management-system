@@ -13,12 +13,17 @@ const { tasks } = require('../config/db');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
+router.use(auth);
 
 // ─── Get All Tasks (with optional filters) ──────────────────
 router.get('/', (req, res) => {
     try {
         let filteredTasks = [...tasks];
         const { status, priority, assignedTo, projectId, search } = req.query;
+
+        if (req.user.role === 'member') {
+            filteredTasks = filteredTasks.filter(t => t.assignedTo === req.user.name);
+        }
 
         // Apply filters
         if (status) {
@@ -62,6 +67,9 @@ router.get('/:id', (req, res) => {
     if (!task) {
         return res.status(404).json({ error: 'Task not found', status: 'not_found' });
     }
+    if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+        return res.status(403).json({ error: 'Access denied to this task.', status: 'forbidden' });
+    }
     res.json({ status: 'success', task });
 });
 
@@ -81,13 +89,15 @@ router.post('/', (req, res) => {
         const validStatuses = ['todo', 'in-progress', 'done'];
         const validPriorities = ['low', 'medium', 'high'];
 
+        const taskAssignee = req.user.role === 'member' ? req.user.name : (assignedTo || req.user.name || 'Unassigned');
+
         const newTask = {
             id: uuidv4(),
             title: title.trim(),
             description: description ? description.trim() : '',
             status: validStatuses.includes(taskStatus) ? taskStatus : 'todo',
             priority: validPriorities.includes(priority) ? priority : 'medium',
-            assignedTo: assignedTo || 'Unassigned',
+            assignedTo: taskAssignee,
             projectId: projectId || null,
             dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString(),
             createdAt: new Date().toISOString(),
@@ -114,15 +124,18 @@ router.put('/:id', (req, res) => {
             return res.status(404).json({ error: 'Task not found', status: 'not_found' });
         }
 
-        const { title, description, status: taskStatus, priority, assignedTo, dueDate } = req.body;
         const task = tasks[taskIndex];
+        if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+            return res.status(403).json({ error: 'Access denied to update this task.', status: 'forbidden' });
+        }
 
-        // Update only provided fields
+        const { title, description, status: taskStatus, priority, assignedTo, dueDate } = req.body;
+
         if (title !== undefined) task.title = title.trim();
         if (description !== undefined) task.description = description.trim();
         if (taskStatus !== undefined) task.status = taskStatus;
         if (priority !== undefined) task.priority = priority;
-        if (assignedTo !== undefined) task.assignedTo = assignedTo;
+        if (req.user.role !== 'member' && assignedTo !== undefined) task.assignedTo = assignedTo;
         if (dueDate !== undefined) task.dueDate = dueDate;
         task.updatedAt = new Date().toISOString();
 
@@ -144,6 +157,11 @@ router.patch('/:id/status', (req, res) => {
         const taskIndex = tasks.findIndex(t => t.id === req.params.id);
         if (taskIndex === -1) {
             return res.status(404).json({ error: 'Task not found', status: 'not_found' });
+        }
+
+        const task = tasks[taskIndex];
+        if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+            return res.status(403).json({ error: 'Access denied to update this task.', status: 'forbidden' });
         }
 
         const { status } = req.body;
@@ -175,7 +193,10 @@ router.delete('/:id', (req, res) => {
     if (taskIndex === -1) {
         return res.status(404).json({ error: 'Task not found', status: 'not_found' });
     }
-
+    const task = tasks[taskIndex];
+    if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+        return res.status(403).json({ error: 'Access denied to delete this task.', status: 'forbidden' });
+    }
     const deletedTask = tasks.splice(taskIndex, 1)[0];
 
     res.json({

@@ -9,8 +9,12 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { projects, tasks } = require('../config/db');
+const auth = require('../middleware/auth');
+const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(auth);
+router.use(authorize('admin', 'manager'));
 
 // ─── Get All Projects ───────────────────────────────────────
 router.get('/', (req, res) => {

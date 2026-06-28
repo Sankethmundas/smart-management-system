@@ -11,14 +11,14 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { users } = require('../config/db');
 const auth = require('../middleware/auth');
-const { JWT_SECRET } = require('../middleware/auth');
+const { authorize, JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
 
 // ─── Register ───────────────────────────────────────────────
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password } = req.body;
 
         // Validation
         if (!name || !email || !password) {
@@ -54,7 +54,7 @@ router.post('/register', async (req, res) => {
             name: name.trim(),
             email: email.toLowerCase().trim(),
             password: hashedPassword,
-            role: role || 'member',
+            role: 'member',
             createdAt: new Date().toISOString()
         };
 
@@ -155,8 +155,8 @@ router.get('/me', auth, (req, res) => {
     });
 });
 
-// ─── Get All Users (Admin/Manager only) ─────────────────────
-router.get('/users', auth, (req, res) => {
+// ─── Get All Users ───────────────────────────────────────
+router.get('/users', auth, authorize('admin', 'manager'), (req, res) => {
     const userList = users.map(u => ({
         id: u.id,
         name: u.name,

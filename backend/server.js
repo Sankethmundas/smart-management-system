@@ -15,6 +15,8 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/tasks');
 const projectRoutes = require('./routes/projects');
+const auth = require('./middleware/auth');
+const { authorize } = require('./middleware/auth');
 const { seedDemoData } = require('./config/db');
 
 const app = express();
@@ -44,7 +46,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── Analytics Endpoint ─────────────────────────────────────
-app.get('/api/analytics', (req, res) => {
+app.get('/api/analytics', auth, require('./middleware/auth').authorize('admin', 'manager'), (req, res) => {
     const db = require('./config/db');
     const tasks = db.tasks;
     const users = db.users;
