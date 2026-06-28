@@ -198,12 +198,29 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = data.user;
             updateSidebarUser(currentUser);
             setAuthState();
+            setRoleState(currentUser.role);
+            updateRoleBadge(currentUser.role);
             return true;
         } catch (err) {
             console.error('Login error:', err);
             alert('Unable to login. Please try again later.');
             return false;
         }
+    }
+
+    function demoLogin(role) {
+        const demoAccounts = {
+            admin: { email: 'sanketh@demo.com', password: 'admin123' },
+            manager: { email: 'priya@demo.com', password: 'pass123' },
+            member: { email: 'rahul@demo.com', password: 'pass123' }
+        };
+
+        const credentials = demoAccounts[role];
+        if (!credentials) return;
+
+        loginEmail.value = credentials.email;
+        loginPassword.value = credentials.password;
+        loginForm.requestSubmit();
     }
 
     function updateRoleBadge(role) {
@@ -244,6 +261,10 @@ document.addEventListener('DOMContentLoaded', () => {
     showRegister.addEventListener('click', () => setActiveView('register'));
     showLogin.addEventListener('click', () => setActiveView('login'));
     gotoRegisterBtn.addEventListener('click', () => setActiveView('register'));
+
+    document.getElementById('demo-admin-btn').addEventListener('click', () => demoLogin('admin'));
+    document.getElementById('demo-manager-btn').addEventListener('click', () => demoLogin('manager'));
+    document.getElementById('demo-member-btn').addEventListener('click', () => demoLogin('member'));
 
     function togglePasswordVisibility(input, button) {
         const isHidden = input.type === 'password';
@@ -309,7 +330,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const success = await loginUser(email, password);
         if (success) {
-            setActiveView('dashboard');
+            const destination = currentUser.role === 'member' ? 'tasks' : 'dashboard';
+            setActiveView(destination);
             refreshActiveView();
         }
     });

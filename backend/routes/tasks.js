@@ -9,21 +9,48 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { tasks } = require('../config/db');
+const { tasks, projects } = require('../config/db');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
 router.use(auth);
 
+function getAccessibleTaskIds(user) {
+    if (user.role === 'admin') {
+        return tasks.map(t => t.id);
+    }
+
+    if (user.role === 'manager') {
+        const managedProjectIds = projects
+            .filter(project => project.members.includes(user.id))
+            .map(project => project.id);
+
+        return tasks
+            .filter(task => task.assignedTo === user.name || (task.projectId && managedProjectIds.includes(task.projectId)))
+            .map(task => task.id);
+    }
+
+    return tasks
+        .filter(task => task.assignedTo === user.name)
+        .map(task => task.id);
+}
+
+function canAccessTask(task, user) {
+    if (user.role === 'admin') return true;
+    if (user.role === 'manager') {
+        const project = projects.find(p => p.id === task.projectId);
+        return task.assignedTo === user.name || (project && project.members.includes(user.id));
+    }
+    return task.assignedTo === user.name;
+}
+
 // ─── Get All Tasks (with optional filters) ──────────────────
 router.get('/', (req, res) => {
     try {
-        let filteredTasks = [...tasks];
+        const accessibleTaskIds = getAccessibleTaskIds(req.user);
+        let filteredTasks = tasks.filter(task => accessibleTaskIds.includes(task.id));
         const { status, priority, assignedTo, projectId, search } = req.query;
 
-        if (req.user.role === 'member') {
-            filteredTasks = filteredTasks.filter(t => t.assignedTo === req.user.name);
-        }
 
         // Apply filters
         if (status) {
@@ -67,7 +94,7 @@ router.get('/:id', (req, res) => {
     if (!task) {
         return res.status(404).json({ error: 'Task not found', status: 'not_found' });
     }
-    if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+    if (!canAccessTask(task, req.user)) {
         return res.status(403).json({ error: 'Access denied to this task.', status: 'forbidden' });
     }
     res.json({ status: 'success', task });
@@ -125,7 +152,7 @@ router.put('/:id', (req, res) => {
         }
 
         const task = tasks[taskIndex];
-        if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+        if (!canAccessTask(task, req.user)) {
             return res.status(403).json({ error: 'Access denied to update this task.', status: 'forbidden' });
         }
 
@@ -160,7 +187,7 @@ router.patch('/:id/status', (req, res) => {
         }
 
         const task = tasks[taskIndex];
-        if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+        if (!canAccessTask(task, req.user)) {
             return res.status(403).json({ error: 'Access denied to update this task.', status: 'forbidden' });
         }
 
@@ -194,7 +221,7 @@ router.delete('/:id', (req, res) => {
         return res.status(404).json({ error: 'Task not found', status: 'not_found' });
     }
     const task = tasks[taskIndex];
-    if (req.user.role === 'member' && task.assignedTo !== req.user.name) {
+    if (!canAccessTask(task, req.user)) {
         return res.status(403).json({ error: 'Access denied to delete this task.', status: 'forbidden' });
     }
     const deletedTask = tasks.splice(taskIndex, 1)[0];
