@@ -10,34 +10,341 @@ document.addEventListener('DOMContentLoaded', () => {
     const navItems = document.querySelectorAll('.nav-item');
     const views = document.querySelectorAll('.view');
     const pageTitle = document.getElementById('page-title');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarClose = document.getElementById('sidebar-close');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const menuToggle = document.getElementById('menu-toggle');
+    const userInfo = document.getElementById('user-info');
+    const logoutBtn = document.getElementById('logout-btn');
+    const loginForm = document.getElementById('login-form');
+    const loginEmail = document.getElementById('login-email');
+    const loginPassword = document.getElementById('login-password');
+    const profileName = document.getElementById('profile-name');
+    const profileEmail = document.getElementById('profile-email');
+    const profileRole = document.getElementById('profile-role');
+    const registerForm = document.getElementById('register-form');
+    const registerName = document.getElementById('register-name');
+    const registerEmail = document.getElementById('register-email');
+    const registerPassword = document.getElementById('register-password');
+    const registerConfirmPassword = document.getElementById('register-confirm-password');
+    const toggleLoginPassword = document.getElementById('toggle-login-password');
+    const toggleRegisterPassword = document.getElementById('toggle-register-password');
+    const toggleRegisterConfirmPassword = document.getElementById('toggle-register-confirm-password');
+    const gotoRegisterBtn = document.getElementById('goto-register-btn');
+    const showRegister = document.getElementById('show-register');
+    const showLogin = document.getElementById('show-login');
+    const protectedNavItems = document.querySelectorAll('.nav-item.requires-auth');
+    const roleNavItems = document.querySelectorAll('.nav-item[data-roles]');
+
+    const titles = {
+        dashboard: 'Dashboard',
+        kanban: 'Kanban Board',
+        tasks: 'All Tasks',
+        projects: 'Projects',
+        team: 'Team Members',
+        profile: 'My Profile',
+        login: 'Login',
+        register: 'Register'
+    };
+
+    let currentToken = localStorage.getItem('token');
+    let currentUser = null;
+
+    function closeMobileMenu() {
+        sidebar.classList.remove('open');
+    }
+
+    function toggleMobileMenu() {
+        sidebar.classList.toggle('open');
+    }
+
+    function setGuestState() {
+        sidebar.classList.add('guest');
+        protectedNavItems.forEach(item => item.style.display = 'none');
+        const addTaskBtn = document.getElementById('add-task-btn');
+        if (addTaskBtn) addTaskBtn.style.display = 'none';
+    }
+
+    function setAuthState() {
+        sidebar.classList.remove('guest');
+        protectedNavItems.forEach(item => item.style.display = '');
+        const addTaskBtn = document.getElementById('add-task-btn');
+        if (addTaskBtn) addTaskBtn.style.display = '';
+    }
+
+    function isNavAllowed(item) {
+        const roles = item.dataset.roles ? item.dataset.roles.split(',') : [];
+        return !roles.length || roles.includes(currentUser.role);
+    }
+
+    function setRoleState(role) {
+        roleNavItems.forEach(item => {
+            const roles = item.dataset.roles ? item.dataset.roles.split(',') : [];
+            if (!roles.length || roles.includes(role)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        const activeNav = document.querySelector('.nav-item.active');
+        if (activeNav && !isNavAllowed(activeNav)) {
+            setActiveView('tasks');
+        }
+    }
+
+    async function handleUnauthorized(res) {
+        if (res.status === 401 || res.status === 403) {
+            logoutUser();
+            alert('Your session has expired or you are not authorized. Please login again.');
+            return true;
+        }
+        return false;
+    }
+
+    async function authFetch(url, options = {}) {
+        if (!options.headers) options.headers = {};
+        if (currentToken) {
+            options.headers.Authorization = `Bearer ${currentToken}`;
+        }
+        options.headers['Content-Type'] = options.headers['Content-Type'] || 'application/json';
+
+        const res = await fetch(url, options);
+        if (await handleUnauthorized(res)) {
+            throw new Error('Unauthorized');
+        }
+        return res;
+    }
+
+    const roleBadge = document.getElementById('role-badge');
+
+    function setActiveView(viewId) {
+        views.forEach(v => v.classList.remove('active'));
+        navItems.forEach(n => n.classList.toggle('active', n.dataset.view === viewId));
+        const view = document.getElementById(`view-${viewId}`);
+        if (view) view.classList.add('active');
+        const titleText = viewId === 'tasks' && currentUser?.role === 'member'
+            ? 'My Tasks'
+            : titles[viewId] || 'Dashboard';
+        pageTitle.textContent = titleText;
+    }
+
+    function updateSidebarUser(user) {
+        const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'GU';
+        document.querySelector('.user-avatar').textContent = initials;
+        document.querySelector('.user-name').textContent = user.name || 'Guest User';
+        document.querySelector('.user-role').textContent = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Visitor';
+        profileName.textContent = user.name || 'Guest User';
+        profileEmail.textContent = user.email || 'guest@demo.com';
+        profileRole.textContent = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Visitor';
+    }
+
+    async function loadCurrentUser() {
+        if (!currentToken) {
+            navItems.forEach(n => n.classList.remove('active'));
+            currentUser = { name: 'Guest User', email: 'guest@demo.com', role: 'Visitor' };
+            updateSidebarUser(currentUser);
+            setGuestState();
+            setActiveView('login');
+            return;
+        }
+
+        try {
+            const res = await authFetch(`${API_BASE}/auth/me`, {
+                method: 'GET'
+            });
+            const data = await res.json();
+            if (res.ok && data.user) {
+                currentUser = data.user;
+                updateSidebarUser(currentUser);
+                setAuthState();
+                setRoleState(currentUser.role);
+                updateRoleBadge(currentUser.role);
+                if (currentUser.role === 'member') {
+                    setActiveView('tasks');
+                } else {
+                    setActiveView('dashboard');
+                }
+                refreshActiveView();
+                return;
+            }
+        } catch (err) {
+            console.error('Error loading current user:', err);
+        }
+
+        localStorage.removeItem('token');
+        currentToken = null;
+        navItems.forEach(n => n.classList.remove('active'));
+        currentUser = { name: 'Guest User', email: 'guest@demo.com', role: 'Visitor' };
+        updateSidebarUser(currentUser);
+        setGuestState();
+        setActiveView('login');
+    }
+
+    async function loginUser(email, password) {
+        try {
+            const res = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || 'Login failed.');
+                return false;
+            }
+            currentToken = data.token;
+            localStorage.setItem('token', currentToken);
+            currentUser = data.user;
+            updateSidebarUser(currentUser);
+            setAuthState();
+            return true;
+        } catch (err) {
+            console.error('Login error:', err);
+            alert('Unable to login. Please try again later.');
+            return false;
+        }
+    }
+
+    function updateRoleBadge(role) {
+        if (!roleBadge) return;
+        const label = role === 'admin'
+            ? 'Admin'
+            : role === 'manager'
+                ? 'Manager'
+                : role === 'member'
+                    ? 'Member'
+                    : 'Guest';
+        roleBadge.textContent = `${label} Access`;
+    }
+
+    function logoutUser() {
+        currentToken = null;
+        currentUser = { name: 'Guest User', email: 'guest@demo.com', role: 'Visitor' };
+        localStorage.removeItem('token');
+        updateSidebarUser(currentUser);
+        setGuestState();
+        updateRoleBadge('Visitor');
+        setActiveView('login');
+    }
+
+    function isNavAllowed(item) {
+        const roles = item.dataset.roles ? item.dataset.roles.split(',') : [];
+        return !roles.length || roles.includes(currentUser.role);
+    }
+
+    function openProfile() {
+        if (currentUser && currentUser.id) {
+            setActiveView('profile');
+        } else {
+            setActiveView('login');
+        }
+    }
+
+    showRegister.addEventListener('click', () => setActiveView('register'));
+    showLogin.addEventListener('click', () => setActiveView('login'));
+    gotoRegisterBtn.addEventListener('click', () => setActiveView('register'));
+
+    function togglePasswordVisibility(input, button) {
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        button.textContent = isHidden ? '🙈' : '👁️';
+    }
+
+    toggleLoginPassword.addEventListener('click', () => togglePasswordVisibility(loginPassword, toggleLoginPassword));
+    toggleRegisterPassword.addEventListener('click', () => togglePasswordVisibility(registerPassword, toggleRegisterPassword));
+    toggleRegisterConfirmPassword.addEventListener('click', () => togglePasswordVisibility(registerConfirmPassword, toggleRegisterConfirmPassword));
+
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = registerName.value.trim();
+        const email = registerEmail.value.trim();
+        const password = registerPassword.value.trim();
+        const confirmPassword = registerConfirmPassword.value.trim();
+
+        if (!name || !email || !password || !confirmPassword) {
+            alert('Name, email, password, and confirm password are required.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match. Please check and try again.');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || 'Registration failed.');
+                return;
+            }
+            alert('Registration successful! Please login.');
+            setActiveView('login');
+            registerForm.reset();
+        } catch (err) {
+            console.error('Registration error:', err);
+            alert('Unable to register. Please try again later.');
+        }
+    });
+
+    menuToggle.addEventListener('click', toggleMobileMenu);
+    sidebarClose.addEventListener('click', closeMobileMenu);
+    sidebarOverlay.addEventListener('click', closeMobileMenu);
+
+    userInfo.addEventListener('click', openProfile);
+    logoutBtn.addEventListener('click', logoutUser);
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = loginEmail.value.trim();
+        const password = loginPassword.value.trim();
+        if (!email || !password) {
+            alert('Email and password are required.');
+            return;
+        }
+        const success = await loginUser(email, password);
+        if (success) {
+            setActiveView('dashboard');
+            refreshActiveView();
+        }
+    });
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
+            if (item.classList.contains('requires-auth') && !currentToken) {
+                alert('Please login to access this section.');
+                setActiveView('login');
+                return;
+            }
+
+            if (!isNavAllowed(item)) {
+                alert('You do not have access to this section.');
+                setActiveView('tasks');
+                return;
+            }
+
             navItems.forEach(n => n.classList.remove('active'));
             item.classList.add('active');
 
-            views.forEach(v => v.classList.remove('active'));
-            const viewId = `view-${item.dataset.view}`;
-            const view = document.getElementById(viewId);
-            if (view) view.classList.add('active');
+            const viewId = item.dataset.view;
+            setActiveView(viewId);
 
-            const titles = {
-                dashboard: 'Dashboard',
-                kanban: 'Kanban Board',
-                tasks: 'All Tasks',
-                projects: 'Projects',
-                team: 'Team Members'
-            };
-            pageTitle.textContent = titles[item.dataset.view] || 'Dashboard';
+            if (viewId === 'dashboard') loadDashboard();
+            if (viewId === 'kanban') loadKanban();
+            if (viewId === 'tasks') loadTasksList();
+            if (viewId === 'projects') loadProjects();
+            if (viewId === 'team') loadTeam();
 
-            // Reload data for the active view
-            if (item.dataset.view === 'dashboard') loadDashboard();
-            if (item.dataset.view === 'kanban') loadKanban();
-            if (item.dataset.view === 'tasks') loadTasksList();
-            if (item.dataset.view === 'projects') loadProjects();
-            if (item.dataset.view === 'team') loadTeam();
+            closeMobileMenu();
         });
     });
+
+    loadCurrentUser();
 
     // ─── Modal Controls ──────────────────────────────────
     const modalOverlay = document.getElementById('modal-overlay');
@@ -71,9 +378,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const res = await fetch(`${API_BASE}/tasks`, {
+            const res = await authFetch(`${API_BASE}/tasks`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(taskData)
             });
             const data = await res.json();
@@ -91,16 +397,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('global-search').addEventListener('input', async (e) => {
         const query = e.target.value.trim();
         if (query.length > 1) {
-            const res = await fetch(`${API_BASE}/tasks?search=${encodeURIComponent(query)}`);
-            const data = await res.json();
-            if (data.status === 'success') {
-                renderTasksTable(data.tasks);
-                // Switch to tasks view
-                navItems.forEach(n => n.classList.remove('active'));
-                document.getElementById('nav-tasks').classList.add('active');
-                views.forEach(v => v.classList.remove('active'));
-                document.getElementById('view-tasks').classList.add('active');
-                pageTitle.textContent = `Search: "${query}"`;
+            try {
+                const res = await authFetch(`${API_BASE}/tasks?search=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    renderTasksTable(data.tasks);
+                    navItems.forEach(n => n.classList.remove('active'));
+                    document.getElementById('nav-tasks').classList.add('active');
+                    views.forEach(v => v.classList.remove('active'));
+                    document.getElementById('view-tasks').classList.add('active');
+                    pageTitle.textContent = `Search: "${query}"`;
+                }
+            } catch (err) {
+                console.error('Search error:', err);
             }
         }
     });
@@ -112,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── Dashboard ───────────────────────────────────────
     async function loadDashboard() {
         try {
-            const res = await fetch(`${API_BASE}/analytics`);
+            const res = await authFetch(`${API_BASE}/analytics`);
             const data = await res.json();
 
             // Update stat cards
@@ -217,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── Kanban Board ────────────────────────────────────
     async function loadKanban() {
         try {
-            const res = await fetch(`${API_BASE}/tasks`);
+            const res = await authFetch(`${API_BASE}/tasks`);
             const data = await res.json();
             const tasks = data.tasks || [];
 
@@ -283,9 +592,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newStatus = column.parentElement.dataset.status;
 
                 try {
-                    await fetch(`${API_BASE}/tasks/${taskId}/status`, {
+                    await authFetch(`${API_BASE}/tasks/${taskId}/status`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ status: newStatus })
                     });
                     loadKanban();
@@ -306,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (status) url += `status=${status}&`;
             if (priority) url += `priority=${priority}&`;
 
-            const res = await fetch(url);
+            const res = await authFetch(url);
             const data = await res.json();
             renderTasksTable(data.tasks || []);
         } catch (err) {
@@ -336,7 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── Projects ────────────────────────────────────────
     async function loadProjects() {
         try {
-            const res = await fetch(`${API_BASE}/projects`);
+            const res = await authFetch(`${API_BASE}/projects`);
             const data = await res.json();
             const grid = document.getElementById('projects-grid');
 
@@ -361,11 +669,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── Team ────────────────────────────────────────────
     async function loadTeam() {
         try {
-            const res = await fetch(`${API_BASE}/auth/users`);
+            const res = await authFetch(`${API_BASE}/auth/users`);
             const data = await res.json();
             const grid = document.getElementById('team-grid');
+            const users = data.users || [];
 
-            grid.innerHTML = (data.users || []).map(user => {
+            if (!res.ok || users.length === 0) {
+                grid.innerHTML = `<div class="empty-state">No team members available at the moment.</div>`;
+                return;
+            }
+
+            grid.innerHTML = users.map(user => {
                 const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
                 return `
                     <div class="team-card">
@@ -378,6 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join('');
         } catch (err) {
             console.error('Error loading team:', err);
+            document.getElementById('team-grid').innerHTML = `<div class="empty-state">Unable to load team members. Please refresh.</div>`;
         }
     }
 
@@ -394,17 +709,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─── Initial Load ────────────────────────────────────
-    loadDashboard();
-});
+    loadCurrentUser();
 
-// Global function for delete (called from inline onclick)
-async function deleteTask(id) {
-    if (!confirm('Delete this task?')) return;
-    try {
-        await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-        // Refresh active view
-        document.querySelector('.nav-item.active').click();
-    } catch (err) {
-        console.error('Error deleting task:', err);
-    }
-}
+    // Make deleteTask accessible to inline onclick handlers
+    window.deleteTask = async function deleteTask(id) {
+        if (!confirm('Delete this task?')) return;
+        try {
+            const res = await authFetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                refreshActiveView();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Unable to delete task.');
+            }
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            alert('Unable to delete task. Please try again.');
+        }
+    };
+});

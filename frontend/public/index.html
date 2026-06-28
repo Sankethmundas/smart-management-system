@@ -16,26 +16,30 @@
             <div class="sidebar-header">
                 <span class="sidebar-logo">⚡</span>
                 <h2>TaskFlow</h2>
+                <button class="sidebar-close" id="sidebar-close" aria-label="Close navigation">×</button>
             </div>
             <nav class="sidebar-nav" id="sidebar-nav">
-                <button class="nav-item active" data-view="dashboard" id="nav-dashboard">
+                <button class="nav-item requires-auth active" data-view="dashboard" data-roles="admin,manager" id="nav-dashboard">
                     <span class="nav-icon">📊</span> Dashboard
                 </button>
-                <button class="nav-item" data-view="kanban" id="nav-kanban">
+                <button class="nav-item requires-auth" data-view="kanban" data-roles="admin,manager" id="nav-kanban">
                     <span class="nav-icon">📋</span> Kanban Board
                 </button>
-                <button class="nav-item" data-view="tasks" id="nav-tasks">
+                <button class="nav-item requires-auth" data-view="tasks" data-roles="admin,manager,member" id="nav-tasks">
                     <span class="nav-icon">✅</span> All Tasks
                 </button>
-                <button class="nav-item" data-view="projects" id="nav-projects">
+                <button class="nav-item requires-auth" data-view="projects" data-roles="admin,manager" id="nav-projects">
                     <span class="nav-icon">📁</span> Projects
                 </button>
-                <button class="nav-item" data-view="team" id="nav-team">
+                <button class="nav-item requires-auth" data-view="team" data-roles="admin,manager" id="nav-team">
                     <span class="nav-icon">👥</span> Team
+                </button>
+                <button class="nav-item requires-auth" data-view="profile" data-roles="admin,manager,member" id="nav-profile">
+                    <span class="nav-icon">👤</span> Profile
                 </button>
             </nav>
             <div class="sidebar-footer">
-                <div class="user-info" id="user-info">
+                <div class="user-info" id="user-info" tabindex="0" role="button" aria-label="Open profile">
                     <div class="user-avatar">SK</div>
                     <div>
                         <div class="user-name">Sanketh Kumar</div>
@@ -44,6 +48,7 @@
                 </div>
             </div>
         </aside>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
         <!-- ─── Main Content ─────────────────────────────── -->
         <main class="main-content" id="main-content">
@@ -51,7 +56,10 @@
             <header class="topbar" id="topbar">
                 <div class="topbar-left">
                     <button class="menu-toggle" id="menu-toggle">☰</button>
-                    <h2 class="page-title" id="page-title">Dashboard</h2>
+                    <div class="page-title-wrapper">
+                        <h2 class="page-title" id="page-title">Dashboard</h2>
+                        <span class="role-badge" id="role-badge">Guest</span>
+                    </div>
                 </div>
                 <div class="topbar-right">
                     <div class="search-bar">
@@ -178,6 +186,82 @@
             <!-- ─── Team View ────────────────────────── -->
             <section class="view" id="view-team">
                 <div class="team-grid" id="team-grid"></div>
+            </section>
+
+            <!-- ─── Profile View ─────────────────────── -->
+            <section class="view" id="view-profile">
+                <div class="profile-card">
+                    <h3>My Profile</h3>
+                    <div class="profile-meta">
+                        <div><strong>Name:</strong> <span id="profile-name">Guest User</span></div>
+                        <div><strong>Email:</strong> <span id="profile-email">guest@demo.com</span></div>
+                        <div><strong>Role:</strong> <span id="profile-role">Visitor</span></div>
+                    </div>
+                    <button class="btn btn-secondary" id="logout-btn">Logout</button>
+                </div>
+            </section>
+
+            <!-- ─── Login View ───────────────────────── -->
+            <section class="view" id="view-login">
+                <div class="login-card">
+                    <h3>Login</h3>
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="login-email">Email</label>
+                            <input type="email" id="login-email" required placeholder="Enter your email">
+                        </div>
+                        <div class="form-group password-group">
+                            <label for="login-password">Password</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="login-password" required placeholder="Enter your password">
+                                <button type="button" class="password-toggle" id="toggle-login-password" aria-label="Toggle password visibility">👁️</button>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Login</button>
+                            <button type="button" class="btn btn-secondary" id="goto-register-btn">Register</button>
+                        </div>
+                    </form>
+                    <div class="auth-switch">
+                        Don’t have an account? <button type="button" class="link-btn" id="show-register">Register</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="view" id="view-register">
+                <div class="login-card">
+                    <h3>Register</h3>
+                    <form id="register-form">
+                        <div class="form-group">
+                            <label for="register-name">Name</label>
+                            <input type="text" id="register-name" required placeholder="Enter your name">
+                        </div>
+                        <div class="form-group">
+                            <label for="register-email">Email</label>
+                            <input type="email" id="register-email" required placeholder="Enter your email">
+                        </div>
+                        <div class="form-group password-group">
+                            <label for="register-password">Password</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="register-password" required placeholder="Create a password">
+                                <button type="button" class="password-toggle" id="toggle-register-password" aria-label="Toggle password visibility">👁️</button>
+                            </div>
+                        </div>
+                        <div class="form-group password-group">
+                            <label for="register-confirm-password">Confirm Password</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="register-confirm-password" required placeholder="Confirm your password">
+                                <button type="button" class="password-toggle" id="toggle-register-confirm-password" aria-label="Toggle password visibility">👁️</button>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Register</button>
+                        </div>
+                    </form>
+                    <div class="auth-switch">
+                        Already have an account? <button type="button" class="link-btn" id="show-login">Login</button>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
