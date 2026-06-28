@@ -162,11 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setAuthState();
                 setRoleState(currentUser.role);
                 updateRoleBadge(currentUser.role);
-                if (currentUser.role === 'member') {
-                    setActiveView('tasks');
-                } else {
-                    setActiveView('dashboard');
-                }
+                setActiveView('dashboard');
                 refreshActiveView();
                 return;
             }
