@@ -19,7 +19,7 @@
                 <button class="sidebar-close" id="sidebar-close" aria-label="Close navigation">×</button>
             </div>
             <nav class="sidebar-nav" id="sidebar-nav">
-                <button class="nav-item requires-auth active" data-view="dashboard" data-roles="admin,manager" id="nav-dashboard">
+                <button class="nav-item requires-auth active" data-view="dashboard" data-roles="admin,manager,member" id="nav-dashboard">
                     <span class="nav-icon">📊</span> Dashboard
                 </button>
                 <button class="nav-item requires-auth" data-view="kanban" data-roles="admin,manager" id="nav-kanban">
@@ -205,6 +205,11 @@
             <section class="view" id="view-login">
                 <div class="login-card">
                     <h3>Login</h3>
+                    <div class="demo-login-links">
+                        <span class="demo-login-link" id="demo-admin-btn">Admin Login</span>
+                        <span class="demo-login-link" id="demo-manager-btn">Manager Login</span>
+                        <span class="demo-login-link" id="demo-member-btn">Member Login</span>
+                    </div>
                     <form id="login-form">
                         <div class="form-group">
                             <label for="login-email">Email</label>
@@ -222,11 +227,6 @@
                             <button type="button" class="btn btn-secondary" id="goto-register-btn">Register</button>
                         </div>
                     </form>
-                    <div class="demo-login">
-                        <button type="button" class="btn btn-secondary" id="demo-admin-btn">Admin Login</button>
-                        <button type="button" class="btn btn-secondary" id="demo-manager-btn">Manager Login</button>
-                        <button type="button" class="btn btn-secondary" id="demo-member-btn">Member Login</button>
-                    </div>
                     <div class="auth-switch">
                         Don’t have an account? <button type="button" class="link-btn" id="show-register">Register</button>
                     </div>

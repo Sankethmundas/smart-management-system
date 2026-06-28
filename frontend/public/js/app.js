@@ -125,7 +125,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (view) view.classList.add('active');
         const titleText = viewId === 'tasks' && currentUser?.role === 'member'
             ? 'My Tasks'
-            : titles[viewId] || 'Dashboard';
+            : viewId === 'dashboard' && currentUser?.role === 'member'
+                ? 'My Progress'
+                : titles[viewId] || 'Dashboard';
         pageTitle.textContent = titleText;
     }
 
@@ -330,8 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const success = await loginUser(email, password);
         if (success) {
-            const destination = currentUser.role === 'member' ? 'tasks' : 'dashboard';
-            setActiveView(destination);
+            setActiveView('dashboard');
             refreshActiveView();
         }
     });
@@ -443,6 +444,66 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── Dashboard ───────────────────────────────────────
     async function loadDashboard() {
         try {
+            if (currentUser.role === 'member') {
+                const res = await authFetch(`${API_BASE}/tasks`);
+                const data = await res.json();
+                const tasks = data.tasks || [];
+
+                const totalTasks = tasks.length;
+                const completedTasks = tasks.filter(t => t.status === 'done').length;
+                const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
+                const todoTasks = tasks.filter(t => t.status === 'todo').length;
+                const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+                const priorityCounts = {
+                    high: tasks.filter(t => t.priority === 'high').length,
+                    medium: tasks.filter(t => t.priority === 'medium').length,
+                    low: tasks.filter(t => t.priority === 'low').length
+                };
+
+                const upcoming = tasks
+                    .filter(t => t.dueDate && t.status !== 'done')
+                    .map(t => ({ ...t, dueInDays: Math.ceil((new Date(t.dueDate) - new Date()) / 86400000) }))
+                    .filter(t => t.dueInDays >= 0)
+                    .sort((a, b) => a.dueInDays - b.dueInDays)
+                    .slice(0, 5);
+
+                const highPriorityTasks = tasks.filter(t => t.priority === 'high' && t.status !== 'done');
+                const urgentTasks = upcoming.filter(t => t.dueInDays <= 3);
+
+                document.getElementById('stat-total-value').textContent = totalTasks;
+                document.getElementById('stat-completed-value').textContent = completedTasks;
+                document.getElementById('stat-progress-value').textContent = inProgressTasks;
+                document.getElementById('stat-rate-value').textContent = `${completionRate}%`;
+
+                renderStatusChart({ todoTasks, inProgressTasks, completedTasks });
+                renderPriorityChart(priorityCounts);
+
+                const activityList = document.getElementById('activity-list');
+                if (urgentTasks.length === 0) {
+                    activityList.innerHTML = `<div class="activity-item"><span class="activity-task">No urgent deadlines in the next 3 days.</span></div>`;
+                } else {
+                    activityList.innerHTML = urgentTasks.map(a => `
+                        <div class="activity-item">
+                            <div>
+                                <span class="activity-task">${a.title}</span>
+                                <span class="status-badge ${a.status}">${a.status}</span>
+                            </div>
+                            <div>
+                                <span class="priority-badge ${a.priority}">${a.priority}</span>
+                                <span class="activity-time">${a.dueInDays === 0 ? 'Due today' : `Due in ${a.dueInDays} day${a.dueInDays > 1 ? 's' : ''}`}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                const urgentHeader = document.getElementById('urgent-header');
+                if (urgentHeader) {
+                    urgentHeader.textContent = `High Priority + Near Deadline (${urgentTasks.length})`;
+                }
+                return;
+            }
+
             const res = await authFetch(`${API_BASE}/analytics`);
             const data = await res.json();
 

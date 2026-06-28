@@ -10,6 +10,7 @@
  */
 
 const jwt = require('jsonwebtoken');
+const { users } = require('../config/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'smartmgmt_secret_key_2024';
 
@@ -43,7 +44,13 @@ function authMiddleware(req, res, next) {
     try {
         // Verify and decode token
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;  // { id, email, role }
+        const storedUser = users.find(u => u.id === decoded.id);
+        req.user = {
+            id: decoded.id,
+            email: decoded.email,
+            role: decoded.role,
+            name: storedUser ? storedUser.name : decoded.name || ''
+        };
         next();
     } catch (err) {
         if (err.name === 'TokenExpiredError') {

@@ -76,6 +76,43 @@ body {
     padding: 0;
 }
 
+.demo-login-links {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.demo-login-link {
+    display: inline-block;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    position: relative;
+    padding-bottom: 2px;
+}
+
+.demo-login-link::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: width var(--transition);
+}
+
+.demo-login-link:hover::after {
+    width: 100%;
+}
+
+.demo-login-link:hover {
+    color: var(--accent);
+}
+
 .auth-switch {
     margin-top: 1.2rem;
     color: var(--text-secondary);
